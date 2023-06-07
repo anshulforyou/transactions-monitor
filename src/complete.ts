@@ -46,11 +46,11 @@ async function trackTransactions() {
     if (existingTransaction) {
         // Update the status to "queued"
         await collection.updateOne({ txHash }, { $set: { status: 'Queued' } });
-        console.log('Status: Queued');
+        console.log(`Transaction ${txHash} status: Queued`);
     } else {
         // Insert a new document with the status as "pending"
         await collection.insertOne(transaction);
-        console.log('Status: Pending');
+        console.log(`Transaction ${txHash} status: Pending`);
     }
   });
 
@@ -69,40 +69,46 @@ async function trackTransactions() {
     // Iterate through the transactions in the block
     for (const txHash of block.transactions) {
       const tx = await web3.eth.getTransaction(txHash);
-        
-      let status;
-      // Get the transaction receipt
+
+      try {
         const receipt = await getTransactionReceiptWithRetry(txHash, 3);
 
-        // Check for confirmed, failed and cancelled transactions
-        if (receipt.status === true) {
-            status = 'Confirmed';
+        let status;
+
+        // Check for successful execution (status=true) and non-zero gasUsed
+        if (receipt.status === true && receipt.gasUsed > 0) {
+          status = 'Confirmed';
+        } else if (+tx.value > 0) {
+          status = 'Cancelled';
         } else {
-            // Failed transactions with value > 0 are considered as cancelled
-            if (+tx.value > 0) {
-              status = 'Cancelled';
-            }else {
-              status = 'Failed';
-            }
+          status = 'Failed';
         }
+
         // Update the transaction status in MongoDB
-      await db.collection('transactions').updateOne(
-        { txHash: txHash},
-        { 
-          $set: { status },
-          $setOnInsert: {
-            txHash: txHash,
-            from: tx.from,
-            to: tx.to,
-            value: web3.utils.fromWei(tx.value, 'ether'),
-            gasPrice: web3.utils.fromWei(tx.gasPrice, 'gwei'),
-            gasUsed: tx.gas,
-            blockNumber: receipt.blockNumber,
-          } 
-        },
-        { upsert: true }
-      );
+        await db.collection('transactions').updateOne(
+          { txHash: txHash },
+          {
+            $set: { status },
+            $setOnInsert: {
+              txHash: txHash,
+              from: tx.from,
+              to: tx.to,
+              value: web3.utils.fromWei(tx.value, 'ether'),
+              gasPrice: web3.utils.fromWei(tx.gasPrice, 'gwei'),
+              gasUsed: tx.gas,
+              blockNumber: receipt.blockNumber,
+            },
+          },
+          { upsert: true }
+        );
+
+        console.log(`Transaction ${txHash} status: ${status}`);
+      } catch (error) {
+        console.error('Error retrieving transaction receipt:', error);
+        console.log(`Transaction ${txHash} status: Pending`);
+      }
     }
+
   });
 }
 
@@ -125,6 +131,10 @@ async function getTransactionReceiptWithRetry(txHash: string, maxRetries: number
     retries++;
     const delay = Math.pow(2, retries) * 1000; // Exponential backoff in milliseconds
     await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  if (!receipt) {
+    throw new Error(`Failed to retrieve receipt for transaction ${txHash}`);
   }
 
   return receipt;

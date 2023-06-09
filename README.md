@@ -61,6 +61,17 @@ Replace `<MongoDB connection string>` with the connection string for your MongoD
 
 3. The application will output logs indicating the status of each tracked transaction in real-time.
 
+## Testing
+1. Install jest and other dependencies
+```sh
+    npm install --save-dev jest ts-jest @types/jest
+```
+
+2. Run the tests
+```sh
+    npm test
+```
+
 ## Notes
 
 - The application uses the Web3 library to interact with the Polygon network and the MongoDB Node.js driver to connect to the database.

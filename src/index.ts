@@ -1,8 +1,11 @@
 import Web3 from 'web3';
-import { MongoClient } from 'mongodb';
+import {MongoClient} from 'mongodb';
 import * as dotenv from 'dotenv';
 
-import { subscribePendingTransactions, subscribeBlockHeaders } from './transactionFeed/transactionSources';
+import {
+  subscribePendingTransactions,
+  subscribeBlockHeaders,
+} from './transactionFeed/transactionSources';
 
 dotenv.config();
 

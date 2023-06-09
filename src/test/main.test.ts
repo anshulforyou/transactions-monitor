@@ -1,6 +1,8 @@
 import Web3 from 'web3';
-import { MongoClient, Db } from 'mongodb';
-import { getTransactionWithRetry, getTransactionReceiptWithRetry } from '../transactionFeed/helpers';
+import {
+  getTransactionWithRetry,
+  getTransactionReceiptWithRetry,
+} from '../transactionFeed/helpers';
 
 describe('getTransactionWithRetry', () => {
   const mockGetTransaction = jest.fn();
@@ -11,11 +13,12 @@ describe('getTransactionWithRetry', () => {
   } as unknown as Web3;
 
   beforeEach(() => {
+    console.error = jest.fn();
     jest.clearAllMocks();
   });
 
   it('should return transaction object if transaction exists', async () => {
-    const mockTx = { hash: '0x123', from: '0x456', to: '0x789', value: '100' };
+    const mockTx = {hash: '0x123', from: '0x456', to: '0x789', value: '100'};
     mockGetTransaction.mockResolvedValueOnce(mockTx);
 
     const result = await getTransactionWithRetry(mockWeb3, '0x123', 3);
@@ -26,20 +29,29 @@ describe('getTransactionWithRetry', () => {
   });
 
   it('should retry if transaction does not exist', async () => {
-    mockGetTransaction.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce({ hash: '0x123' });
+    mockGetTransaction
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({hash: '0x123'});
 
     const result = await getTransactionWithRetry(mockWeb3, '0x123', 3);
 
     expect(mockGetTransaction).toHaveBeenCalledTimes(3);
-    expect(result).toEqual({ hash: '0x123' });
+    expect(result).toEqual({hash: '0x123'});
   }, 5000);
 
   it('should log error if transaction does not exist after max retries', async () => {
     mockGetTransaction.mockResolvedValue(null);
+    jest.spyOn(console, 'error').mockImplementationOnce(() => {});
 
-    await expect(getTransactionWithRetry(mockWeb3, '0x123', 3)).rejects.toThrowError('Failed to retrieve transaction 0x123');
+    await expect(
+      getTransactionWithRetry(mockWeb3, '0x123', 3)
+    ).resolves.toBeNull();
     expect(mockGetTransaction).toHaveBeenCalledTimes(3);
-    // expect(console.error).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to retrieve transaction 0x123'
+    );
   }, 5000);
 });
 
@@ -56,7 +68,11 @@ describe('getTransactionReceiptWithRetry', () => {
   });
 
   it('should return transaction receipt if receipt exists', async () => {
-    const mockReceipt = { transactionHash: '0x123', blockNumber: 123, status: true };
+    const mockReceipt = {
+      transactionHash: '0x123',
+      blockNumber: 123,
+      status: true,
+    };
     mockGetTransactionReceipt.mockResolvedValueOnce(mockReceipt);
 
     const result = await getTransactionReceiptWithRetry(mockWeb3, '0x123', 3);
@@ -67,18 +83,23 @@ describe('getTransactionReceiptWithRetry', () => {
   });
 
   it('should retry if transaction receipt does not exist', async () => {
-    mockGetTransactionReceipt.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce({ transactionHash: '0x123' });
+    mockGetTransactionReceipt
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({transactionHash: '0x123'});
 
     const result = await getTransactionReceiptWithRetry(mockWeb3, '0x123', 3);
 
     expect(mockGetTransactionReceipt).toHaveBeenCalledTimes(3);
-    expect(result).toEqual({ transactionHash: '0x123' });
+    expect(result).toEqual({transactionHash: '0x123'});
   }, 5000);
 
   it('should throw error if transaction receipt does not exist after max retries', async () => {
     mockGetTransactionReceipt.mockResolvedValue(null);
 
-    await expect(getTransactionReceiptWithRetry(mockWeb3, '0x123', 3)).rejects.toThrowError('Failed to retrieve receipt for transaction 0x123');
+    await expect(
+      getTransactionReceiptWithRetry(mockWeb3, '0x123', 3)
+    ).rejects.toThrowError('Failed to retrieve receipt for transaction 0x123');
     expect(mockGetTransactionReceipt).toHaveBeenCalledTimes(3);
   }, 5000);
 });
@@ -113,7 +134,7 @@ describe('subscribePendingTransactions', () => {
   it('should insert new transaction if it does not exist in the database', async () => {
     const mockTxHash = '0x123';
     const mockTx = {
-      from: "0xabc",
+      from: '0xabc',
       to: '0xdef',
       value: '1000000000000000000',
       gasPrice: '1000000000',
@@ -122,7 +143,9 @@ describe('subscribePendingTransactions', () => {
     mockSubscribe.mockImplementationOnce((_, callback) => {
       callback(null, mockTxHash);
     });
-    jest.spyOn(helpers, 'getTransactionWithRetry').mockResolvedValueOnce(mockTx);
+    jest
+      .spyOn(helpers, 'getTransactionWithRetry')
+      .mockResolvedValueOnce(mockTx);
 
     mockFindOne.mockResolvedValueOnce(null);
     mockInsertOne.mockResolvedValueOnce({
@@ -131,19 +154,28 @@ describe('subscribePendingTransactions', () => {
     });
 
     try {
-      await expect(transactionSources.subscribePendingTransactions(mockDb, mockWeb3)).resolves.toEqual(undefined);
+      await expect(
+        transactionSources.subscribePendingTransactions(mockDb, mockWeb3)
+      ).resolves.toEqual(undefined);
     } catch (error) {
       console.log(error);
     }
 
     expect(mockSubscribe).toHaveBeenCalledTimes(1);
-    expect(mockSubscribe).toHaveBeenCalledWith('pendingTransactions', expect.any(Function));
+    expect(mockSubscribe).toHaveBeenCalledWith(
+      'pendingTransactions',
+      expect.any(Function)
+    );
 
     expect(helpers.getTransactionWithRetry).toHaveBeenCalledTimes(1);
-    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(mockWeb3, mockTxHash, 3);
+    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(
+      mockWeb3,
+      mockTxHash,
+      3
+    );
 
     expect(mockFindOne).toHaveBeenCalledTimes(1);
-    expect(mockFindOne).toHaveBeenCalledWith({ txHash: mockTxHash });
+    expect(mockFindOne).toHaveBeenCalledWith({txHash: mockTxHash});
 
     expect(mockInsertOne).toHaveBeenCalledTimes(1);
     expect(mockInsertOne).toHaveBeenCalledWith({
@@ -158,7 +190,10 @@ describe('subscribePendingTransactions', () => {
 
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledTimes(2);
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.value, 'ether');
-    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.gasPrice, 'gwei');
+    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(
+      mockTx.gasPrice,
+      'gwei'
+    );
   });
 
   it('should update existing transaction if it exists in the database', async () => {
@@ -175,23 +210,38 @@ describe('subscribePendingTransactions', () => {
     mockSubscribe.mockImplementationOnce((_, callback) => {
       callback(null, mockTxHash);
     });
-    mockFindOne.mockResolvedValueOnce({ txHash: mockTxHash });
+    mockFindOne.mockResolvedValueOnce({txHash: mockTxHash});
 
     try {
-      await expect(transactionSources.subscribePendingTransactions(mockDb, mockWeb3)).resolves.toEqual(undefined);
+      await expect(
+        transactionSources.subscribePendingTransactions(mockDb, mockWeb3)
+      ).resolves.toEqual(undefined);
     } catch (error) {
       console.log(error);
     }
 
     expect(mockSubscribe).toHaveBeenCalledTimes(1);
-    expect(mockSubscribe).toHaveBeenCalledWith('pendingTransactions', expect.any(Function));
+    expect(mockSubscribe).toHaveBeenCalledWith(
+      'pendingTransactions',
+      expect.any(Function)
+    );
     expect(mockUpdateOne).toHaveBeenCalledTimes(1);
-    expect(mockUpdateOne).toHaveBeenCalledWith({ txHash: mockTxHash }, { $set: { status: 'Queued' } });
+    expect(mockUpdateOne).toHaveBeenCalledWith(
+      {txHash: mockTxHash},
+      {$set: {status: 'Queued'}}
+    );
     expect(helpers.getTransactionWithRetry).toHaveBeenCalledTimes(1);
-    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(mockWeb3, mockTxHash, 3);
+    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(
+      mockWeb3,
+      mockTxHash,
+      3
+    );
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledTimes(2);
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.value, 'ether');
-    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.gasPrice, 'gwei');
+    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(
+      mockTx.gasPrice,
+      'gwei'
+    );
   });
 });
 
@@ -211,7 +261,7 @@ describe('subscribeBlockHeaders', () => {
       fromWei: jest.fn().mockReturnValue('1'),
     },
   } as unknown as Web3;
-  
+
   const mockDb = {
     collection: jest.fn().mockReturnValue({
       updateOne: mockUpdateOne,
@@ -226,7 +276,7 @@ describe('subscribeBlockHeaders', () => {
     const mockBlockHash = '0x123';
     const mockTxHash = '0x456';
     const mockTx = {
-      from: "0xabc",
+      from: '0xabc',
       to: '0xdef',
       value: '1000000000000000000',
       gasPrice: '1000000000',
@@ -244,27 +294,42 @@ describe('subscribeBlockHeaders', () => {
       transactions: [mockTxHash],
     });
     helpers.getTransactionWithRetry = jest.fn().mockResolvedValueOnce(mockTx);
-    helpers.getTransactionReceiptWithRetry = jest.fn().mockResolvedValueOnce(mockReceipt);
-    
-    await await expect(transactionSources.subscribeBlockHeaders(mockDb, mockWeb3)).resolves.toBeUndefined();
+    helpers.getTransactionReceiptWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce(mockReceipt);
+
+    await await expect(
+      transactionSources.subscribeBlockHeaders(mockDb, mockWeb3)
+    ).resolves.toBeUndefined();
 
     expect(mockSubscribe).toHaveBeenCalledTimes(1);
-    expect(mockSubscribe).toHaveBeenCalledWith('newBlockHeaders', expect.any(Function));
+    expect(mockSubscribe).toHaveBeenCalledWith(
+      'newBlockHeaders',
+      expect.any(Function)
+    );
 
     expect(mockGetBlock).toHaveBeenCalledTimes(1);
     expect(mockGetBlock).toHaveBeenCalledWith(mockBlockHash);
 
     expect(helpers.getTransactionWithRetry).toHaveBeenCalledTimes(1);
-    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(mockWeb3, mockTxHash, 3);
+    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(
+      mockWeb3,
+      mockTxHash,
+      3
+    );
 
     expect(helpers.getTransactionReceiptWithRetry).toHaveBeenCalledTimes(1);
-    expect(helpers.getTransactionReceiptWithRetry).toHaveBeenCalledWith(mockWeb3, mockTxHash, 3);
+    expect(helpers.getTransactionReceiptWithRetry).toHaveBeenCalledWith(
+      mockWeb3,
+      mockTxHash,
+      3
+    );
 
     expect(mockUpdateOne).toHaveBeenCalledTimes(1);
     expect(mockUpdateOne).toHaveBeenCalledWith(
-      { txHash: mockTxHash },
+      {txHash: mockTxHash},
       {
-        $set: { status: 'Confirmed' },
+        $set: {status: 'Confirmed'},
         $setOnInsert: {
           txHash: mockTxHash,
           from: mockTx.from,
@@ -275,19 +340,22 @@ describe('subscribeBlockHeaders', () => {
           blockNumber: mockReceipt.blockNumber,
         },
       },
-      { upsert: true }
+      {upsert: true}
     );
 
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledTimes(2);
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.value, 'ether');
-    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.gasPrice, 'gwei');
+    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(
+      mockTx.gasPrice,
+      'gwei'
+    );
   });
 
   it('should update the collection with the correct status when the receipt status is false and value is greater than 0', async () => {
     const mockBlockHash = '0x123';
     const mockTxHash = '0x456';
     const mockTx = {
-      from: "0xabc",
+      from: '0xabc',
       to: '0xdef',
       value: '1000000000000000000',
       gasPrice: '1000000000',
@@ -305,27 +373,42 @@ describe('subscribeBlockHeaders', () => {
       transactions: [mockTxHash],
     });
     helpers.getTransactionWithRetry = jest.fn().mockResolvedValueOnce(mockTx);
-    helpers.getTransactionReceiptWithRetry = jest.fn().mockResolvedValueOnce(mockReceipt);
-    
-    await await expect(transactionSources.subscribeBlockHeaders(mockDb, mockWeb3)).resolves.toBeUndefined();
+    helpers.getTransactionReceiptWithRetry = jest
+      .fn()
+      .mockResolvedValueOnce(mockReceipt);
+
+    await await expect(
+      transactionSources.subscribeBlockHeaders(mockDb, mockWeb3)
+    ).resolves.toBeUndefined();
 
     expect(mockSubscribe).toHaveBeenCalledTimes(1);
-    expect(mockSubscribe).toHaveBeenCalledWith('newBlockHeaders', expect.any(Function));
+    expect(mockSubscribe).toHaveBeenCalledWith(
+      'newBlockHeaders',
+      expect.any(Function)
+    );
 
     expect(mockGetBlock).toHaveBeenCalledTimes(1);
     expect(mockGetBlock).toHaveBeenCalledWith(mockBlockHash);
 
     expect(helpers.getTransactionWithRetry).toHaveBeenCalledTimes(1);
-    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(mockWeb3, mockTxHash, 3);
+    expect(helpers.getTransactionWithRetry).toHaveBeenCalledWith(
+      mockWeb3,
+      mockTxHash,
+      3
+    );
 
     expect(helpers.getTransactionReceiptWithRetry).toHaveBeenCalledTimes(1);
-    expect(helpers.getTransactionReceiptWithRetry).toHaveBeenCalledWith(mockWeb3, mockTxHash, 3);
+    expect(helpers.getTransactionReceiptWithRetry).toHaveBeenCalledWith(
+      mockWeb3,
+      mockTxHash,
+      3
+    );
 
     expect(mockUpdateOne).toHaveBeenCalledTimes(1);
     expect(mockUpdateOne).toHaveBeenCalledWith(
-      { txHash: mockTxHash },
+      {txHash: mockTxHash},
       {
-        $set: { status: 'Cancelled' },
+        $set: {status: 'Cancelled'},
         $setOnInsert: {
           txHash: mockTxHash,
           from: mockTx.from,
@@ -336,11 +419,14 @@ describe('subscribeBlockHeaders', () => {
           blockNumber: mockReceipt.blockNumber,
         },
       },
-      { upsert: true }
+      {upsert: true}
     );
 
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledTimes(2);
     expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.value, 'ether');
-    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(mockTx.gasPrice, 'gwei');
+    expect(mockWeb3.utils.fromWei).toHaveBeenCalledWith(
+      mockTx.gasPrice,
+      'gwei'
+    );
   });
 });

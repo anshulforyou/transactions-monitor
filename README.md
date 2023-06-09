@@ -52,7 +52,7 @@ Replace `<MongoDB connection string>` with the connection string for your MongoD
 1. Start the application:
 
 ```sh
-    npm run start
+    npm start
 ```
 
     The application will connect to the Polygon network and begin tracking transactions.
@@ -76,5 +76,6 @@ Replace `<MongoDB connection string>` with the connection string for your MongoD
 
 - The application uses the Web3 library to interact with the Polygon network and the MongoDB Node.js driver to connect to the database.
 - The `trackTransactions` function subscribes to pending transactions and new block headers to monitor and update transaction statuses.
-- The `getTransactionReceiptWithRetry` function is used to retrieve transaction receipts with retry logic to handle network failures.
+- The `getTransactionWithRetry` function is used to retrieve transaction with retry logic to handle network failures. The function logs error if it fails even after retries.
+- The `getTransactionReceiptWithRetry` function is used to retrieve transaction receipts with retry logic to handle network failures. The function throws error if it fails even after retries.
 - The code can be extended to include additional functionality or customize the database structure as per your requirements.
